@@ -4,6 +4,10 @@
 
 See streaks, heatmaps, language stats, repo health, achievements, and more — all from your local git history.
 
+<p align="center">
+  <img src="resources/screenshot.png" alt="huntd VS Code sidebar dashboard" width="800">
+</p>
+
 ## Requirements
 
 Install the huntd CLI first:
