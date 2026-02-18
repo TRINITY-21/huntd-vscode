@@ -1,7 +1,13 @@
-import { execFile } from "child_process";
+import { exec } from "child_process";
 import { promisify } from "util";
+import * as vscode from "vscode";
 
-const execFileAsync = promisify(execFile);
+const execAsync = promisify(exec);
+
+function getHuntdCommand(): string {
+  const config = vscode.workspace.getConfiguration("huntd");
+  return config.get<string>("executablePath", "") || "huntd";
+}
 
 export interface HuntdData {
   total_repos: number;
@@ -57,22 +63,26 @@ export async function runHuntd(
   scanPath: string,
   author?: string
 ): Promise<HuntdData> {
-  const args = [scanPath, "--json"];
+  const huntd = getHuntdCommand();
+  const quotedPath = `"${scanPath}"`;
+  let cmd = `${huntd} ${quotedPath} --json`;
   if (author) {
-    args.push("--author", author);
+    cmd += ` --author "${author}"`;
   }
 
   try {
-    const { stdout } = await execFileAsync("huntd", args, {
+    const { stdout } = await execAsync(cmd, {
       timeout: 120_000,
       maxBuffer: 10 * 1024 * 1024,
+      shell: "/bin/zsh",
+      env: { ...process.env, PATH: process.env.PATH + ":/usr/local/bin:/opt/homebrew/bin" },
     });
     return JSON.parse(stdout) as HuntdData;
   } catch (err: unknown) {
     const error = err as Error & { code?: string };
-    if (error.code === "ENOENT") {
+    if (error.message?.includes("not found") || error.message?.includes("ENOENT")) {
       throw new Error(
-        "huntd not found. Install it with: pip install huntd"
+        "huntd CLI not found. Install it with: pip install huntd"
       );
     }
     throw new Error(`huntd failed: ${error.message}`);
@@ -80,8 +90,13 @@ export async function runHuntd(
 }
 
 export async function isHuntdInstalled(): Promise<boolean> {
+  const huntd = getHuntdCommand();
   try {
-    await execFileAsync("huntd", ["--version"], { timeout: 5000 });
+    await execAsync(`${huntd} --version`, {
+      timeout: 5000,
+      shell: "/bin/zsh",
+      env: { ...process.env, PATH: process.env.PATH + ":/usr/local/bin:/opt/homebrew/bin" },
+    });
     return true;
   } catch {
     return false;
